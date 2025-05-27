@@ -10,7 +10,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Remplace par ta vraie chaîne de connexion MongoDB
-const mongoURI = 'mongodb+srv://amrtikande:<tikande123.@>@annotator.lmmiriy.mongodb.net/?retryWrites=true&w=majority&appName=annotator';
+const mongoURI = 'mongodb+srv://amrtikande:tikande123.@@annotator.lmmiriy.mongodb.net/?retryWrites=true&w=majority&appName=annotator';
 
 // Connexion à MongoDB
 mongoose.connect(mongoURI, {
