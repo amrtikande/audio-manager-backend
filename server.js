@@ -10,7 +10,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Connecte-toi à MongoDB Atlas
-const mongoURI = 'mongodb+srv://amrtikande:<db_password>@annotator.lmmiriy.mongodb.net/?retryWrites=true&w=majority&appName=annotator';
+const mongoURI = 'mongodb+srv://amrtikande:<tikande123.@>@annotator.lmmiriy.mongodb.net/?retryWrites=true&w=majority&appName=annotator';
 
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
