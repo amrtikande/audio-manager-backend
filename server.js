@@ -1,65 +1,53 @@
 const express = require('express');
-const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
+
+const packsFile = path.join(__dirname, 'data', 'packs.json');
 
 app.use(cors());
 app.use(bodyParser.json());
 
-let packs = [];
+// 🔁 Lire les packs depuis le fichier
+function lirePacks() {
+  const raw = fs.readFileSync(packsFile, 'utf-8');
+  return JSON.parse(raw);
+}
 
-app.get('/packs', (req, res) => res.json(packs));
+// 💾 Sauvegarder les packs dans le fichier
+function sauvegarderPacks(packs) {
+  fs.writeFileSync(packsFile, JSON.stringify(packs, null, 2));
+}
 
-app.post('/packs', (req, res) => {
-  const { name, customName } = req.body;
-  const newPack = {
-    id: packs.length + 1,
-    name: name || `PACK AUDIO N°${packs.length + 1}`,
-    customName: customName || '',
-    validated: false
-  };
-  packs.push(newPack);
-  res.json(newPack);
+// 🔹 GET - Tous les packs
+app.get('/packs', (req, res) => {
+  const packs = lirePacks();
+  res.json(packs);
 });
 
-app.post('/toggle-pack', (req, res) => {
-  const { id, validated } = req.body;
-  const pack = packs.find(p => p.id === id);
-  if (pack) {
-    pack.validated = validated;
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Pack not found' });
-  }
-});
-
-app.get('/solde', (req, res) => {
-  const validatedCount = packs.filter(p => p.validated).length;
-  res.json({ solde: validatedCount * 4000 });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-// PATCH /packs/:id/toggle
-app.patch('/packs/:id/toggle', async (req, res) => {
+// 🔹 PATCH - Toggle validated
+app.patch('/packs/:id/toggle', (req, res) => {
   const { id } = req.params;
   const { validated } = req.body;
+  const packs = lirePacks();
 
-  try {
-    const packs = await lirePacks(); // lire depuis le fichier ou base
-    const index = packs.findIndex(p => p.id === id);
-    if (index !== -1) {
-      packs[index].validated = validated;
-      await sauvegarderPacks(packs); // fonction qui écrit dans le fichier ou la BDD
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Pack non trouvé' });
-    }
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
+  const pack = packs.find(p => p.id === id);
+  if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
+
+  pack.validated = validated;
+  sauvegarderPacks(packs);
+  res.json({ success: true, pack });
 });
 
+// 🔹 GET - Solde total des packs validés
+app.get('/solde', (req, res) => {
+  const packs = lirePacks();
+  const solde = packs.filter(p => p.validated).reduce((sum, p) => sum + p.amount, 0);
+  res.json({ solde });
+});
+
+app.listen(PORT, () => console.log(`Serveur démarré sur http://localhost:${PORT}`));
