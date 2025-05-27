@@ -1,53 +1,72 @@
 const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
-const bodyParser = require('body-parser');
-const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
-
-const packsFile = path.join(__dirname, 'data', 'packs.json');
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'packs.json');
 
 app.use(cors());
 app.use(bodyParser.json());
 
-// 🔁 Lire les packs depuis le fichier
-function lirePacks() {
-  const raw = fs.readFileSync(packsFile, 'utf-8');
-  return JSON.parse(raw);
+let packs = [];
+
+// Charger les packs depuis le fichier au démarrage
+function loadPacks() {
+  if (fs.existsSync(DATA_FILE)) {
+    const data = fs.readFileSync(DATA_FILE);
+    packs = JSON.parse(data);
+  }
 }
 
-// 💾 Sauvegarder les packs dans le fichier
-function sauvegarderPacks(packs) {
-  fs.writeFileSync(packsFile, JSON.stringify(packs, null, 2));
+// Sauvegarder les packs dans le fichier
+function savePacks() {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(packs, null, 2));
 }
 
-// 🔹 GET - Tous les packs
+// Initialiser les données
+loadPacks();
+
+// Obtenir la liste des packs
 app.get('/packs', (req, res) => {
-  const packs = lirePacks();
   res.json(packs);
 });
 
-// 🔹 PATCH - Toggle validated
-app.patch('/packs/:id/toggle', (req, res) => {
-  const { id } = req.params;
-  const { validated } = req.body;
-  const packs = lirePacks();
+// Ajouter un nouveau pack
+app.post('/packs', (req, res) => {
+  const { name, customName } = req.body;
+  const newPack = {
+    id: packs.length + 1,
+    name: name || `PACK AUDIO N°${packs.length + 1}`,
+    customName: customName || '',
+    validated: false
+  };
+  packs.push(newPack);
+  savePacks();
+  res.json(newPack);
+});
 
+// Activer/désactiver un pack
+app.post('/toggle-pack', (req, res) => {
+  const { id, validated } = req.body;
   const pack = packs.find(p => p.id === id);
-  if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
-
-  pack.validated = validated;
-  sauvegarderPacks(packs);
-  res.json({ success: true, pack });
+  if (pack) {
+    pack.validated = validated;
+    savePacks();
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Pack not found' });
+  }
 });
 
-// 🔹 GET - Solde total des packs validés
+// Retourner le solde total
 app.get('/solde', (req, res) => {
-  const packs = lirePacks();
-  const solde = packs.filter(p => p.validated).reduce((sum, p) => sum + p.amount, 0);
-  res.json({ solde });
+  const validatedCount = packs.filter(p => p.validated).length;
+  res.json({ solde: validatedCount * 4000 });
 });
 
-app.listen(PORT, () => console.log(`Serveur démarré sur http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Serveur lancé sur le port ${PORT}`);
+});
