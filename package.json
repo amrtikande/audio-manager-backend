@@ -1,13 +1,14 @@
-{
-  "name": "audio-manager-backend",
-  "version": "1.0.0",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
+[
+  {
+    "id": "pack1",
+    "name": "PACK AUDIO N°1",
+    "amount": 2000,
+    "validated": false
   },
-  "dependencies": {
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
-    "express": "^4.18.2"
+  {
+    "id": "pack2",
+    "name": "PACK AUDIO N°2",
+    "amount": 3000,
+    "validated": false
   }
-}
+]
