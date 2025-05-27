@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json()); // Remplace body-parser.json()
 
 // Chaîne de connexion MongoDB depuis variable d'environnement
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://amrtikande:tikande123@audiomanager.tifdhf0.mongodb.net/?retryWrites=true&w=majority&appName=audiomanager';
+const mongoURI = process.env.MONGO_URI || 'mongodb+srv://amrtikande:tikande123@audiomanager.lmmiriy.mongodb.net/audiomanager?retryWrites=true&w=majority';
 
 // Connexion à MongoDB
 mongoose.connect(mongoURI, {
