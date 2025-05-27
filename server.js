@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,68 +9,78 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
-const DATA_PATH = path.join(__dirname, 'packs.json');
+// Connecte-toi à MongoDB Atlas
+const mongoURI = 'mongodb+srv://<username>:<password>@cluster0.mongodb.net/packdb?retryWrites=true&w=majority';
 
-let packs = [];
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => console.log('Connecté à MongoDB Atlas'))
+  .catch(err => console.error('Erreur connexion MongoDB :', err));
 
-// Charger les packs depuis le fichier JSON au démarrage
-function loadPacks() {
-  try {
-    if (fs.existsSync(DATA_PATH)) {
-      const data = fs.readFileSync(DATA_PATH, 'utf-8');
-      packs = JSON.parse(data);
-    }
-  } catch (err) {
-    console.error('Erreur lors du chargement des packs:', err);
-    packs = [];
-  }
-}
-
-// Sauvegarder les packs dans le fichier JSON
-function savePacks() {
-  try {
-    fs.writeFileSync(DATA_PATH, JSON.stringify(packs, null, 2));
-  } catch (err) {
-    console.error('Erreur lors de la sauvegarde des packs:', err);
-  }
-}
-
-loadPacks();
-
-app.get('/packs', (req, res) => {
-  res.json(packs);
+// Schéma Mongoose pour les packs
+const packSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  customName: { type: String, default: '' },
+  validated: { type: Boolean, default: false }
 });
 
-app.post('/packs', (req, res) => {
+const Pack = mongoose.model('Pack', packSchema);
+
+// Routes API
+
+// GET tous les packs
+app.get('/packs', async (req, res) => {
+  try {
+    const packs = await Pack.find();
+    res.json(packs);
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST nouveau pack
+app.post('/packs', async (req, res) => {
   const { name, customName } = req.body;
-  const newPack = {
-    id: packs.length > 0 ? packs[packs.length - 1].id + 1 : 1,
-    name: name || `PACK AUDIO N°${packs.length + 1}`,
-    customName: customName || '',
-    validated: false
-  };
-  packs.push(newPack);
-  savePacks();
-  res.json(newPack);
+  try {
+    const newPack = new Pack({
+      name: name || `PACK AUDIO N°${Date.now()}`, // ou autre logique de nom
+      customName: customName || '',
+      validated: false
+    });
+    await newPack.save();
+    res.json(newPack);
+  } catch (err) {
+    res.status(400).json({ error: 'Erreur lors de la création' });
+  }
 });
 
-app.patch('/packs/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+// PATCH mise à jour d’un pack
+app.patch('/packs/:id', async (req, res) => {
+  const id = req.params.id;
   const { validated, customName } = req.body;
-  const pack = packs.find(p => p.id === id);
-  if (pack) {
+  try {
+    const pack = await Pack.findById(id);
+    if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
+
     if (validated !== undefined) pack.validated = validated;
     if (customName !== undefined) pack.customName = customName;
-    savePacks();
+
+    await pack.save();
     res.json(pack);
-  } else {
-    res.status(404).json({ error: 'Pack not found' });
+  } catch (err) {
+    res.status(400).json({ error: 'Erreur lors de la mise à jour' });
   }
 });
 
-app.get('/solde', (req, res) => {
-  const validatedCount = packs.filter(p => p.validated).length;
-  res.json({ solde: validatedCount * 4000 });
+// GET solde
+app.get('/solde', async (req, res) => {
+  try {
+    const validatedCount = await Pack.countDocuments({ validated: true });
+    res.json({ solde: validatedCount * 4000 });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 app.listen(PORT, () => {
