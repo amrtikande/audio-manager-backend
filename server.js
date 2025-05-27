@@ -43,3 +43,23 @@ app.get('/solde', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+// PATCH /packs/:id/toggle
+app.patch('/packs/:id/toggle', async (req, res) => {
+  const { id } = req.params;
+  const { validated } = req.body;
+
+  try {
+    const packs = await lirePacks(); // lire depuis le fichier ou base
+    const index = packs.findIndex(p => p.id === id);
+    if (index !== -1) {
+      packs[index].validated = validated;
+      await sauvegarderPacks(packs); // fonction qui écrit dans le fichier ou la BDD
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Pack non trouvé' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
