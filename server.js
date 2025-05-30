@@ -79,3 +79,19 @@ app.post('/toggle-pack', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
+// Route pour mettre à jour un pack (valider/dévalider)
+app.put('/packs/:id', async (req, res) => {
+  const { id } = req.params;
+  const { validated, customName } = req.body;
+
+  try {
+    const updatedPack = await Pack.findByIdAndUpdate(
+      id,
+      { validated, customName },
+      { new: true }
+    );
+    res.json(updatedPack);
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur mise à jour pack' });
+  }
+});
