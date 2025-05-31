@@ -95,3 +95,24 @@ app.put('/packs/:id', async (req, res) => {
     res.status(500).json({ error: 'Erreur mise à jour pack' });
   }
 });
+// POST /forgot-password
+app.post('/forgot-password', async (req, res) => {
+  const { username, fullname, secretQuestion, secretAnswer, newPassword } = req.body;
+
+  const user = await User.findOne({ username });
+
+  if (!user || user.fullname !== fullname || user.secretQuestion !== secretQuestion) {
+    return res.status(400).json({ message: 'Informations incorrectes' });
+  }
+
+  const answerMatch = await bcrypt.compare(secretAnswer, user.secretAnswer);
+  if (!answerMatch) {
+    return res.status(400).json({ message: 'Réponse incorrecte' });
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  user.password = hashedPassword;
+  await user.save();
+
+  res.status(200).json({ message: 'Mot de passe mis à jour avec succès.' });
+});
