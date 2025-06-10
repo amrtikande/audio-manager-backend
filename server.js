@@ -35,8 +35,10 @@ const User = mongoose.model('User', userSchema);
 // Modèle Pack (existait déjà dans ton code)
 const packSchema = new mongoose.Schema({
   name: { type: String, default: '' },
-  validated: { type: Boolean, default: false }
+  validated: { type: Boolean, default: false },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true } // <- ajout
 });
+
 const Pack = mongoose.model('Pack', packSchema);
 
 // Routes Pack (ton code existant)
@@ -45,21 +47,27 @@ app.get('/', (req, res) => {
 });
 
 app.get('/packs', async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId requis dans les paramètres de requête' });
+  }
+
   try {
-    const packs = await Pack.find();
+    const packs = await Pack.find({ userId });
     res.json(packs);
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+
 app.post('/packs', async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name || name.trim() === '') {
-      return res.status(400).json({ error: 'Le nom du pack est requis' });
+    const { name, userId } = req.body;
+    if (!name || !userId) {
+      return res.status(400).json({ error: 'Le nom du pack et userId sont requis' });
     }
-    const newPack = new Pack({ name: name.trim(), validated: false });
+    const newPack = new Pack({ name: name.trim(), validated: false, userId });
     await newPack.save();
     res.json({ success: true, pack: newPack });
   } catch (err) {
@@ -87,19 +95,26 @@ app.post('/toggle-pack', async (req, res) => {
 
 app.put('/packs/:id', async (req, res) => {
   const { id } = req.params;
-  const { validated, customName } = req.body;
+  const { validated, customName, userId } = req.body;
 
   try {
-    const updatedPack = await Pack.findByIdAndUpdate(
-      id,
-      { validated, customName },
-      { new: true }
-    );
-    res.json(updatedPack);
+    const pack = await Pack.findById(id);
+    if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
+
+    if (pack.userId.toString() !== userId) {
+      return res.status(403).json({ error: 'Accès non autorisé à ce pack' });
+    }
+
+    if (validated !== undefined) pack.validated = validated;
+    if (customName !== undefined) pack.name = customName;
+
+    await pack.save();
+    res.json(pack);
   } catch (err) {
     res.status(500).json({ error: 'Erreur mise à jour pack' });
   }
 });
+
 
 // Route inscription
 app.post('/signup', async (req, res) => {
