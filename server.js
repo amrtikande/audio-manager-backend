@@ -1,3 +1,6 @@
+const jwt = require('jsonwebtoken');
+const SECRET_KEY = 'ton_secret_ultra_secret'; // stocke ça dans une variable d’environnement en prod !
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -46,14 +49,9 @@ app.get('/', (req, res) => {
   res.send('Serveur OK');
 });
 
-app.get('/packs', async (req, res) => {
-  const { userId } = req.query;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId requis dans les paramètres de requête' });
-  }
-
+app.get('/packs', authenticateToken, async (req, res) => {
   try {
-    const packs = await Pack.find({ userId });
+    const packs = await Pack.find({ userId: req.userId });
     res.json(packs);
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -61,13 +59,13 @@ app.get('/packs', async (req, res) => {
 });
 
 
-app.post('/packs', async (req, res) => {
+
+app.post('/packs', authenticateToken, async (req, res) => {
   try {
-    const { name, userId } = req.body;
-    if (!name || !userId) {
-      return res.status(400).json({ error: 'Le nom du pack et userId sont requis' });
-    }
-    const newPack = new Pack({ name: name.trim(), validated: false, userId });
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Le nom du pack est requis' });
+
+    const newPack = new Pack({ name: name.trim(), validated: false, userId: req.userId });
     await newPack.save();
     res.json({ success: true, pack: newPack });
   } catch (err) {
@@ -157,7 +155,8 @@ app.post('/login', async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return res.status(400).json({ message: 'Mot de passe incorrect' });
 
-    res.json({ message: 'Connexion réussie', userId: user._id, username: user.username });
+const token = jwt.sign({ userId: user._id }, SECRET_KEY, { expiresIn: '7d' });
+res.json({ message: 'Connexion réussie', token });
   } catch (err) {
     res.status(500).json({ message: 'Erreur serveur lors de la connexion' });
   }
@@ -192,3 +191,17 @@ app.post('/forgot-password', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Format attendu: Bearer <token>
+
+  if (!token) return res.status(401).json({ error: 'Token manquant' });
+
+  jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    if (err) return res.status(403).json({ error: 'Token invalide' });
+
+    req.userId = decoded.userId; // On ajoute l'id à la requête
+    next();
+  });
+}
+
