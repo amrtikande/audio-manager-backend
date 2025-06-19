@@ -7,14 +7,14 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SECRET_KEY = process.env.SECRET_KEY || 'mongodb+srv://amrtikande:tikande123@audiomanager.tifdhf0.mongodb.net/?retryWrites=true&w=majority&appName=audiomanager';
+const SECRET_KEY = process.env.SECRET_KEY || 'ton_secret_ultra_secret';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Connexion MongoDB
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://amrtikande:tikande123@audiomanager.tifdhf0.mongodb.net/?retryWrites=true&w=majority&appName=audiomanager', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
@@ -24,7 +24,7 @@ mongoose.connect(process.env.MONGO_URI, {
   process.exit(1);
 });
 
-// Schéma User
+// Modèle User
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   fullname: { type: String, required: true },
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// Schéma Pack
+// Modèle Pack
 const packSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   validated: { type: Boolean, default: false },
