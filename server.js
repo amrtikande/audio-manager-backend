@@ -47,10 +47,17 @@ function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) return res.status(401).json({ error: 'Token manquant' });
+  if (!token) {
+    console.log('Erreur: Token manquant dans la requête');
+    return res.status(401).json({ error: 'Token manquant' });
+  }
 
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
-    if (err) return res.status(403).json({ error: 'Token invalide' });
+    if (err) {
+      console.log('Erreur: Token invalide ou expiré', err);
+      return res.status(403).json({ error: 'Token invalide ou expiré' });
+    }
+    console.log('Token décodé:', decoded); // Log pour vérifier userId
     req.userId = decoded.userId;
     next();
   });
@@ -64,7 +71,7 @@ app.get('/', (req, res) => {
 // Inscription
 app.post('/signup', async (req, res) => {
   const { username, fullname, secretQuestion, secretAnswer, password } = req.body;
-  console.log('Données reçues (signup) :', req.body);
+  console.log('Données reçues (signup):', req.body);
 
   if (!username || !fullname || !secretQuestion || !secretAnswer || !password) {
     return res.status(400).json({ message: 'Tous les champs sont requis' });
@@ -87,10 +94,10 @@ app.post('/signup', async (req, res) => {
     });
 
     await newUser.save();
-    console.log('Utilisateur créé :', newUser);
+    console.log('Utilisateur créé:', newUser);
     res.json({ message: 'Inscription réussie' });
   } catch (err) {
-    console.error('Erreur inscription :', err);
+    console.error('Erreur inscription:', err);
     res.status(500).json({ message: 'Erreur serveur lors de l’inscription' });
   }
 });
@@ -98,7 +105,7 @@ app.post('/signup', async (req, res) => {
 // Connexion
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  console.log('Données reçues (login) :', req.body);
+  console.log('Données reçues (login):', req.body);
 
   try {
     const normalizedUsername = username.trim().toLowerCase();
@@ -109,10 +116,10 @@ app.post('/login', async (req, res) => {
     if (!isPasswordValid) return res.status(400).json({ message: 'Mot de passe incorrect' });
 
     const token = jwt.sign({ userId: user._id }, SECRET_KEY, { expiresIn: '7d' });
-    console.log('Token généré pour :', user._id);
+    console.log('Token généré pour userId:', user._id);
     res.json({ message: 'Connexion réussie', token, userId: user._id });
   } catch (err) {
-    console.error('Erreur connexion :', err);
+    console.error('Erreur connexion:', err);
     res.status(500).json({ message: 'Erreur serveur lors de la connexion' });
   }
 });
@@ -120,7 +127,7 @@ app.post('/login', async (req, res) => {
 // Réinitialisation mot de passe
 app.post('/forgot-password', async (req, res) => {
   const { username, fullname, secretQuestion, secretAnswer, newPassword } = req.body;
-  console.log('Données reçues (forgot-password) :', req.body);
+  console.log('Données reçues (forgot-password):', req.body);
 
   try {
     const normalizedUsername = username.trim().toLowerCase();
@@ -137,10 +144,10 @@ app.post('/forgot-password', async (req, res) => {
     user.password = hashedPassword;
     await user.save();
 
-    console.log('Mot de passe réinitialisé pour :', normalizedUsername);
+    console.log('Mot de passe réinitialisé pour:', normalizedUsername);
     res.status(200).json({ message: 'Mot de passe mis à jour avec succès' });
   } catch (err) {
-    console.error('Erreur réinitialisation :', err);
+    console.error('Erreur réinitialisation:', err);
     res.status(500).json({ message: 'Erreur serveur lors de la réinitialisation' });
   }
 });
@@ -148,10 +155,11 @@ app.post('/forgot-password', async (req, res) => {
 // Récupérer les packs
 app.get('/packs', authenticateToken, async (req, res) => {
   try {
+    console.log('Récupération des packs pour userId:', req.userId);
     const packs = await Pack.find({ userId: req.userId });
     res.json(packs);
   } catch (err) {
-    console.error('Erreur récupération packs :', err);
+    console.error('Erreur récupération packs:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -159,7 +167,8 @@ app.get('/packs', authenticateToken, async (req, res) => {
 // Ajouter un pack
 app.post('/packs', authenticateToken, async (req, res) => {
   const { name } = req.body;
-  console.log('Données reçues (POST /packs) :', req.body);
+  console.log('Données reçues (POST /packs):', req.body);
+  console.log('User ID du token:', req.userId);
 
   try {
     if (!name) return res.status(400).json({ error: 'Le nom du pack est requis' });
@@ -171,9 +180,10 @@ app.post('/packs', authenticateToken, async (req, res) => {
     });
 
     await newPack.save();
+    console.log('Pack créé:', newPack);
     res.json({ success: true, pack: newPack });
   } catch (err) {
-    console.error('Erreur ajout pack :', err);
+    console.error('Erreur ajout pack:', err);
     res.status(500).json({ error: 'Erreur serveur lors de l’ajout' });
   }
 });
@@ -182,22 +192,32 @@ app.post('/packs', authenticateToken, async (req, res) => {
 app.put('/packs/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { validated } = req.body;
-  console.log('Données reçues (PUT /packs/:id) :', req.body);
+  console.log('Données reçues (PUT /packs/:id):', { id, validated, userId: req.userId });
 
   try {
     const pack = await Pack.findById(id);
-    if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
+    if (!pack) {
+      console.log('Pack non trouvé pour ID:', id);
+      return res.status(404).json({ error: 'Pack non trouvé' });
+    }
+
+    console.log('Pack trouvé:', pack);
+    console.log('Comparaison userId: pack.userId=', pack.userId.toString(), 'req.userId=', req.userId);
 
     if (pack.userId.toString() !== req.userId) {
+      console.log('Accès non autorisé: userId mismatch');
       return res.status(403).json({ error: 'Accès non autorisé à ce pack' });
     }
 
-    if (validated !== undefined) pack.validated = validated;
+    if (validated !== undefined) {
+      pack.validated = validated;
+    }
     await pack.save();
+    console.log('Pack mis à jour:', pack);
     res.json(pack);
   } catch (err) {
-    console.error('Erreur mise à jour pack :', err);
-    res.status(500).json({ error: 'Erreur mise à jour pack' });
+    console.error('Erreur mise à jour pack:', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour' });
   }
 });
 
