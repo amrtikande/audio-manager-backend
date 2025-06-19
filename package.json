@@ -1,9 +1,9 @@
 {
   "name": "audio-manager-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -12,5 +12,8 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
