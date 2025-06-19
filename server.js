@@ -57,7 +57,7 @@ function authenticateToken(req, res, next) {
       console.log('Erreur: Token invalide ou expiré', err);
       return res.status(403).json({ error: 'Token invalide ou expiré' });
     }
-    console.log('Token décodé:', decoded); // Log pour vérifier userId
+    console.log('Token décodé:', decoded);
     req.userId = decoded.userId;
     next();
   });
