@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SECRET_KEY = process.env.SECRET_KEY || 'ton_secret_ultra_secret';
+const SECRET_KEY = process.env.SECRET_KEY || 'mongodb+srv://amrtikande:tikande123@audiomanager.tifdhf0.mongodb.net/?retryWrites=true&w=majority&appName=audiomanager';
 
 // Middleware
 app.use(cors());
