@@ -57,7 +57,7 @@ function authenticateToken(req, res, next) {
       console.log('Erreur: Token invalide ou expiré', err);
       return res.status(403).json({ error: 'Token invalide ou expiré' });
     }
-    console.log('Token décodé:', decoded);
+    console.log('Token décodé pour userId:', decoded.userId);
     req.userId = decoded.userId;
     next();
   });
@@ -71,7 +71,7 @@ app.get('/', (req, res) => {
 // Inscription
 app.post('/signup', async (req, res) => {
   const { username, fullname, secretQuestion, secretAnswer, password } = req.body;
-  console.log('Données reçues (signup):', req.body);
+  console.log('Données reçues (signup) pour userId:', req.userId, req.body);
 
   if (!username || !fullname || !secretQuestion || !secretAnswer || !password) {
     return res.status(400).json({ message: 'Tous les champs sont requis' });
@@ -98,7 +98,7 @@ app.post('/signup', async (req, res) => {
     res.json({ message: 'Inscription réussie' });
   } catch (err) {
     console.error('Erreur inscription:', err);
-    res.status(500).json({ message: 'Erreur serveur lors de l’inscription' });
+    res.status(500).json({ message: 'Erreur serveur lors de l’inscription', error: err.message });
   }
 });
 
@@ -120,7 +120,7 @@ app.post('/login', async (req, res) => {
     res.json({ message: 'Connexion réussie', token, userId: user._id });
   } catch (err) {
     console.error('Erreur connexion:', err);
-    res.status(500).json({ message: 'Erreur serveur lors de la connexion' });
+    res.status(500).json({ message: 'Erreur serveur lors de la connexion', error: err.message });
   }
 });
 
@@ -148,7 +148,7 @@ app.post('/forgot-password', async (req, res) => {
     res.status(200).json({ message: 'Mot de passe mis à jour avec succès' });
   } catch (err) {
     console.error('Erreur réinitialisation:', err);
-    res.status(500).json({ message: 'Erreur serveur lors de la réinitialisation' });
+    res.status(500).json({ message: 'Erreur serveur lors de la réinitialisation', error: err.message });
   }
 });
 
@@ -160,15 +160,14 @@ app.get('/packs', authenticateToken, async (req, res) => {
     res.json(packs);
   } catch (err) {
     console.error('Erreur récupération packs:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur', details: err.message });
   }
 });
 
 // Ajouter un pack
 app.post('/packs', authenticateToken, async (req, res) => {
   const { name } = req.body;
-  console.log('Données reçues (POST /packs):', req.body);
-  console.log('User ID du token:', req.userId);
+  console.log('Données reçues (POST /packs) pour userId:', req.userId, req.body);
 
   try {
     if (!name) return res.status(400).json({ error: 'Le nom du pack est requis' });
@@ -184,7 +183,7 @@ app.post('/packs', authenticateToken, async (req, res) => {
     res.json({ success: true, pack: newPack });
   } catch (err) {
     console.error('Erreur ajout pack:', err);
-    res.status(500).json({ error: 'Erreur serveur lors de l’ajout' });
+    res.status(500).json({ error: 'Erreur serveur lors de l’ajout', details: err.message });
   }
 });
 
@@ -192,20 +191,13 @@ app.post('/packs', authenticateToken, async (req, res) => {
 app.put('/packs/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { validated } = req.body;
-  console.log('Données reçues (PUT /packs/:id):', { id, validated, userId: req.userId });
+  console.log('Données reçues (PUT /packs/:id) pour userId:', req.userId, { id, validated });
 
   try {
     const pack = await Pack.findById(id);
-    if (!pack) {
-      console.log('Pack non trouvé pour ID:', id);
-      return res.status(404).json({ error: 'Pack non trouvé' });
-    }
-
-    console.log('Pack trouvé:', pack);
-    console.log('Comparaison userId: pack.userId=', pack.userId.toString(), 'req.userId=', req.userId);
+    if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
 
     if (pack.userId.toString() !== req.userId) {
-      console.log('Accès non autorisé: userId mismatch');
       return res.status(403).json({ error: 'Accès non autorisé à ce pack' });
     }
 
@@ -217,7 +209,29 @@ app.put('/packs/:id', authenticateToken, async (req, res) => {
     res.json(pack);
   } catch (err) {
     console.error('Erreur mise à jour pack:', err);
-    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour' });
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour', details: err.message });
+  }
+});
+
+// Supprimer un pack
+app.delete('/packs/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  console.log('Demande de suppression pour packId:', id, 'par userId:', req.userId);
+
+  try {
+    const pack = await Pack.findById(id);
+    if (!pack) return res.status(404).json({ error: 'Pack non trouvé' });
+
+    if (pack.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Accès non autorisé à ce pack' });
+    }
+
+    await Pack.findByIdAndDelete(id);
+    console.log('Pack supprimé avec succès pour packId:', id);
+    res.json({ success: true, message: 'Pack supprimé avec succès' });
+  } catch (err) {
+    console.error('Erreur suppression pack:', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la suppression', details: err.message });
   }
 });
 
