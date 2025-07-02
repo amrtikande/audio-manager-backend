@@ -38,8 +38,10 @@ const User = mongoose.model('User', userSchema);
 const packSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   validated: { type: Boolean, default: false },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
-});
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  month: { type: String, required: true }, // Format: "janvier 2025"
+  archived: { type: Boolean, default: false }
+}, { timestamps: true });
 const Pack = mongoose.model('Pack', packSchema);
 
 // Middleware d'authentification
@@ -66,6 +68,17 @@ function authenticateToken(req, res, next) {
 // Routes
 app.get('/', (req, res) => {
   res.send('Serveur OK');
+});
+
+// Endpoint pour vérifier l'état du serveur
+app.get('/server-status', async (req, res) => {
+  try {
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    res.json({ status: isMongoConnected ? 'active' : 'sleep' });
+  } catch (err) {
+    console.error('Erreur vérification état serveur:', err);
+    res.status(500).json({ error: 'Erreur serveur', details: err.message });
+  }
 });
 
 // Inscription
@@ -152,12 +165,28 @@ app.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Récupérer les packs
+// Récupérer les packs avec filtrage
 app.get('/packs', authenticateToken, async (req, res) => {
   try {
-    console.log('Récupération des packs pour userId:', req.userId);
-    const packs = await Pack.find({ userId: req.userId });
-    res.json(packs);
+    console.log('Récupération des packs pour userId:', req.userId, 'avec query:', req.query);
+    const { month, status, archived } = req.query;
+    let query = { userId: req.userId };
+
+    if (month) {
+      query.month = month;
+    }
+    if (status === 'validated') query.validated = true;
+    if (status === 'unvalidated') query.validated = false;
+    if (archived !== undefined) query.archived = archived === 'true';
+
+    const packs = await Pack.find(query);
+    // Calculer les sommes
+    const validatedPacks = await Pack.find({ ...query, validated: true });
+    const unvalidatedPacks = await Pack.find({ ...query, validated: false });
+    const earned = validatedPacks.length * 4000;
+    const pending = unvalidatedPacks.length * 4000;
+
+    res.json({ packs, earned, pending });
   } catch (err) {
     console.error('Erreur récupération packs:', err);
     res.status(500).json({ error: 'Erreur serveur', details: err.message });
@@ -172,10 +201,15 @@ app.post('/packs', authenticateToken, async (req, res) => {
   try {
     if (!name) return res.status(400).json({ error: 'Le nom du pack est requis' });
 
+    const now = new Date();
+    const month = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+
     const newPack = new Pack({
       name: name.trim(),
       validated: false,
-      userId: req.userId
+      userId: req.userId,
+      month,
+      archived: false
     });
 
     await newPack.save();
@@ -232,6 +266,23 @@ app.delete('/packs/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Erreur suppression pack:', err);
     res.status(500).json({ error: 'Erreur serveur lors de la suppression', details: err.message });
+  }
+});
+
+// Archiver les packs à la fin du mois (exécuté manuellement ou via un cron)
+app.post('/archive-packs', authenticateToken, async (req, res) => {
+  try {
+    const now = new Date();
+    const currentMonth = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+    await Pack.updateMany(
+      { userId: req.userId, month: { $ne: currentMonth }, archived: false },
+      { $set: { archived: true } }
+    );
+    console.log('Packs archivés pour userId:', req.userId);
+    res.json({ success: true, message: 'Packs archivés avec succès' });
+  } catch (err) {
+    console.error('Erreur archivage packs:', err);
+    res.status(500).json({ error: 'Erreur serveur lors de l’archivage', details: err.message });
   }
 });
 
