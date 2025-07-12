@@ -38,8 +38,9 @@ const User = mongoose.model('User', userSchema);
 const packSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   validated: { type: Boolean, default: false },
+  validatedAt: { type: Date, default: null }, // Nouveau champ pour la date de validation
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  month: { type: String, required: true }, // Format: "janvier 2025"
+  month: { type: String, required: true }, // Format: "janvier 2025" (mois personnalisé)
   archived: { type: Boolean, default: false }
 }, { timestamps: true });
 const Pack = mongoose.model('Pack', packSchema);
@@ -63,6 +64,22 @@ function authenticateToken(req, res, next) {
     req.userId = decoded.userId;
     next();
   });
+}
+
+// Fonction pour déterminer le mois personnalisé (26 du mois précédent au 25 du mois actuel)
+function getCustomMonth(date) {
+  const day = date.getDate();
+  const month = date.getMonth();
+  const year = date.getFullYear();
+
+  // Si la date est le 26 ou après, on est dans le mois personnalisé suivant
+  if (day >= 26) {
+    const nextMonth = new Date(year, month + 1, 1);
+    return nextMonth.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+  } else {
+    // Sinon, on est dans le mois actuel
+    return date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+  }
 }
 
 // Routes
@@ -169,12 +186,9 @@ app.post('/forgot-password', async (req, res) => {
 app.get('/packs', authenticateToken, async (req, res) => {
   try {
     console.log('Récupération des packs pour userId:', req.userId, 'avec query:', req.query);
-    const { month, status, archived } = req.query;
+    const { status, archived } = req.query;
     let query = { userId: req.userId };
 
-    if (month) {
-      query.month = month;
-    }
     if (status === 'validated') query.validated = true;
     if (status === 'unvalidated') query.validated = false;
     if (archived !== undefined) query.archived = archived === 'true';
@@ -202,11 +216,12 @@ app.post('/packs', authenticateToken, async (req, res) => {
     if (!name) return res.status(400).json({ error: 'Le nom du pack est requis' });
 
     const now = new Date();
-    const month = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+    const month = getCustomMonth(now); // Utiliser le mois personnalisé
 
     const newPack = new Pack({
       name: name.trim(),
       validated: false,
+      validatedAt: null,
       userId: req.userId,
       month,
       archived: false
@@ -224,8 +239,8 @@ app.post('/packs', authenticateToken, async (req, res) => {
 // Mettre à jour un pack
 app.put('/packs/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { validated } = req.body;
-  console.log('Données reçues (PUT /packs/:id) pour userId:', req.userId, { id, validated });
+  const { validated, validatedAt } = req.body;
+  console.log('Données reçues (PUT /packs/:id) pour userId:', req.userId, { id, validated, validatedAt });
 
   try {
     const pack = await Pack.findById(id);
@@ -237,6 +252,8 @@ app.put('/packs/:id', authenticateToken, async (req, res) => {
 
     if (validated !== undefined) {
       pack.validated = validated;
+      pack.validatedAt = validated ? (validatedAt || new Date()) : null; // Gérer validatedAt
+      pack.month = validated ? getCustomMonth(new Date(pack.validatedAt)) : getCustomMonth(new Date(pack.createdAt)); // Mettre à jour le mois
     }
     await pack.save();
     console.log('Pack mis à jour:', pack);
@@ -269,15 +286,25 @@ app.delete('/packs/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Archiver les packs à la fin du mois (exécuté manuellement ou via un cron)
+// Archiver les packs validés à la fin du mois
 app.post('/archive-packs', authenticateToken, async (req, res) => {
   try {
     const now = new Date();
-    const currentMonth = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+    const currentMonth = getCustomMonth(now);
+
+    // Archiver uniquement les packs validés dont le mois de validation est antérieur
+    const packs = await Pack.find({ userId: req.userId, archived: false, validated: true });
+    const packsToArchive = packs.filter(pack => {
+      if (!pack.validatedAt) return false;
+      const validationMonth = getCustomMonth(new Date(pack.validatedAt));
+      return validationMonth !== currentMonth;
+    });
+
     await Pack.updateMany(
-      { userId: req.userId, month: { $ne: currentMonth }, archived: false },
+      { _id: { $in: packsToArchive.map(p => p._id) } },
       { $set: { archived: true } }
     );
+
     console.log('Packs archivés pour userId:', req.userId);
     res.json({ success: true, message: 'Packs archivés avec succès' });
   } catch (err) {
