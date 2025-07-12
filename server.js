@@ -8,6 +8,17 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY || 'ton_secret_ultra_secret';
+// Simulation de date pour les tests
+const OriginalDate = Date;
+const simulatedDate = new OriginalDate("2025-07-27"); // Date fixe pour les tests (27 juillet 2025)
+Date = function (...args) {
+  if (args.length === 0) {
+    return simulatedDate;
+  }
+  return new OriginalDate(...args);
+};
+Date.now = () => simulatedDate.getTime();
+
 
 // Middleware
 app.use(cors());
