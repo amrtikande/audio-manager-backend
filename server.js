@@ -4,16 +4,6 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-// Simulation de date pour les tests
-const OriginalDate = Date;
-const simulatedDate = new OriginalDate("2025-07-27"); // Date fixe pour les tests (27 juillet 2025)
-Date = function (...args) {
-  if (args.length === 0) {
-    return simulatedDate;
-  }
-  return new OriginalDate(...args);
-};
-Date.now = () => simulatedDate.getTime();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
