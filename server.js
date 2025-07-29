@@ -9,7 +9,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY || 'ton_secret_ultra_secret';
 
-
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -67,14 +66,14 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Fonction pour déterminer le mois personnalisé (26 du mois précédent au 25 du mois actuel)
+// Fonction pour déterminer le mois personnalisé (16 du mois précédent au 15 du mois actuel)
 function getCustomMonth(date) {
   const day = date.getDate();
   const month = date.getMonth();
   const year = date.getFullYear();
 
-  // Si la date est le 26 ou après, on est dans le mois personnalisé suivant
-  if (day >= 26) {
+  // Si la date est le 16 ou après, on est dans le mois personnalisé suivant
+  if (day >= 16) {
     const nextMonth = new Date(year, month + 1, 1);
     return nextMonth.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
   } else {
