@@ -316,3 +316,40 @@ app.post('/archive-packs', authenticateToken, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
+cron.schedule('0 0 16 * *', async () => {
+  console.log('[ARCHIVE] Lancement archivage automatique...');
+  try {
+    const currentCustomMonth = getCustomMonth();
+    const packsToArchive = await Pack.find({
+      validated: true,
+      archived: false,
+      validatedAt: { $exists: true },
+    });
+
+    const toArchive = packsToArchive.filter(pack => {
+      const packCustomMonth = getCustomMonth(pack.validatedAt);
+      return packCustomMonth !== currentCustomMonth;
+    });
+
+    for (const pack of toArchive) {
+      pack.archived = true;
+      await pack.save();
+    }
+
+    console.log(`[ARCHIVE] ${toArchive.length} pack(s) archivé(s) automatiquement.`);
+  } catch (err) {
+    console.error('[ARCHIVE] Erreur lors de l’archivage automatique :', err);
+  }
+}, {
+  timezone: "Africa/Abidjan" // important pour ton fuseau horaire
+});
+
+// --- 2. Ping MongoDB toutes les 10 minutes ---
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    await mongoose.connection.db.command({ ping: 1 });
+    console.log('[PING] MongoDB réveillé à', new Date().toISOString());
+  } catch (err) {
+    console.error('[PING] Erreur ping MongoDB :', err);
+  }
+});
